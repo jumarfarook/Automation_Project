@@ -7,6 +7,7 @@ echo "!!! Script execution starting !!!"
 myname="umarfarook"
 s3_bucket="upgrad-umarfarook"
 package="apache2"
+apacheroot="/var/www/html"
 
 # update the packages
 echo "**************** updating the packages list **************** "
@@ -52,7 +53,6 @@ tar cvf /tmp/${logfilename}.tar /var/log/apache2/*.log
 echo "successfully archived the logs - ${logfilename}"
 
 echo "**************** installing AWS CLI ****************"
-
 # set the package to awscli so we can check if it is installed
 package="awscli"
 
@@ -69,6 +69,36 @@ else
 fi
 
 echo "**************** uploading the archive file into AWS S3 bucket ****************"
-aws s3 cp /tmp/${logfilename}.tar s3://${s3_bucket}/${logfilename}.tar
+if test -f /tmp/${logfilename}.tar;
+then
+    aws s3 cp /tmp/${logfilename}.tar s3://${s3_bucket}/${logfilename}.tar
+    echo "apache2 logs successfully uploaded to aws s3 bucket"
+fi
+
+echo "**************** creating the inventory bookkeeping file of the logs generated ****************"
+if ! test -f ${apacheroot}/inventory.html;
+then
+    echo "inventory.html does not exist, creating a new one"
+    echo -en 'Log Type\t\t Date Created\t\t Type\t\t Size<br>' > ${apacheroot}/inventory.html
+fi
+
+if test -f ${apacheroot}/inventory.html;
+then
+    echo "inventory.html exists, append the new log file created"
+    filesize=$(du -h /tmp/${logfilename}.tar | awk '{print $1}')
+    echo -en "apache2-logs\t\t ${timestamp}\t\t tar\t\t ${filesize}\t\t<br>" >> ${apacheroot}/inventory.html
+fi
+
+echo "**************** creating a cron to schedule the script to run once a day ****************"
+cronfile=/etc/cron.d/automation
+if ! test -f "$cronfile";
+then
+    echo "#create a cron to run the automation.sh at 12:05am every day" > "$cronfile"
+    echo "5 0 * * * root /root/Automation_Project/automation.sh" >> "$cronfile"
+
+    echo "cron for the automation successfully created"
+else
+    echo "cron for the automation already exists"
+fi
 
 echo "!!! Script execution completed !!!"
